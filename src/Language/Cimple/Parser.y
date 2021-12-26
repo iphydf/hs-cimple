@@ -3,6 +3,7 @@ module Language.Cimple.Parser
     ( parseTranslationUnit
     ) where
 
+import           Data.Functor.Identity  (Identity (..))
 import           Language.Cimple.AST    (AssignOp (..), BinaryOp (..),
                                          CommentStyle (..), LiteralType (..),
                                          Node (..), Scope (..), UnaryOp (..))
@@ -158,7 +159,7 @@ TranslationUnit
 
 LicenseDecl :: { StringNode }
 LicenseDecl
-:	'/*' 'License' CMT_WORD '\n' CopyrightDecls '*/'	{ LicenseDecl $3 $5 }
+:	'/*' 'License' CMT_WORD '\n' CopyrightDecls '*/'	{ mk $ LicenseDecl $3 $5 }
 
 CopyrightDecls :: { [StringNode] }
 CopyrightDecls
@@ -167,7 +168,7 @@ CopyrightDecls
 
 CopyrightDecl :: { StringNode }
 CopyrightDecl
-:	' * ' 'Copyright' CopyrightDates CopyrightOwner '\n'	{ CopyrightDecl (fst $3) (snd $3) $4 }
+:	' * ' 'Copyright' CopyrightDates CopyrightOwner '\n'	{ mk $ CopyrightDecl (fst $3) (snd $3) $4 }
 
 CopyrightDates :: { (StringLexeme, Maybe StringLexeme) }
 CopyrightDates
@@ -204,7 +205,7 @@ ToplevelDecl
 
 StaticAssert :: { StringNode }
 StaticAssert
-:	static_assert '(' ConstExpr ',' LIT_STRING ')' ';'	{ StaticAssert $3 $5 }
+:	static_assert '(' ConstExpr ',' LIT_STRING ')' ';'	{ mk $ StaticAssert $3 $5 }
 
 Namespace :: { StringNode }
 Namespace
@@ -213,18 +214,18 @@ Namespace
 
 NamespaceDeclarator :: { Scope -> StringNode }
 NamespaceDeclarator
-:	class ID_SUE_TYPE TypeParams '{' ToplevelDecls '}'	{ \s -> Class s $2 $3 (reverse $5) }
-|	namespace IdVar '{' ToplevelDecls '}'			{ \s -> Namespace s $2 (reverse $4) }
+:	class ID_SUE_TYPE TypeParams '{' ToplevelDecls '}'	{ \s -> mk $ Class s $2 $3 (reverse $5) }
+|	namespace IdVar '{' ToplevelDecls '}'			{ \s -> mk $ Namespace s $2 (reverse $4) }
 
 TypeParams :: { [StringNode] }
 TypeParams
 :								{ [] }
-|	'<' ID_TYVAR '>'					{ [TyVar $2] }
+|	'<' ID_TYVAR '>'					{ [mk $ TyVar $2] }
 
 Event :: { StringNode }
 Event
-:	event IdVar       '{' Comment EventType '}'		{ Event $2 (Commented $4 $5) }
-|	event IdVar const '{' Comment EventType '}'		{ Event $2 (Commented $5 $6) }
+:	event IdVar       '{' Comment EventType '}'		{ mk $ Event $2 (mk $ Commented $4 $5) }
+|	event IdVar const '{' Comment EventType '}'		{ mk $ Event $2 (mk $ Commented $5 $6) }
 
 EventType :: { StringNode }
 EventType
@@ -232,18 +233,18 @@ EventType
 
 EventParams :: { StringNode }
 EventParams
-:	FunctionParamList					{ EventParams $1 }
+:	FunctionParamList					{ mk $ EventParams $1 }
 
 ErrorDecl :: { StringNode }
 ErrorDecl
-:	'error' for IdVar EnumeratorList			{ ErrorDecl $3 $4 }
+:	'error' for IdVar EnumeratorList			{ mk $ ErrorDecl $3 $4 }
 
 Comment :: { StringNode }
 Comment
-:	'/*' CommentTokens '*/'					{ Comment Regular $1 (reverse $2) $3 }
-|	'/**' CommentTokens '*/'				{ Comment Doxygen $1 (reverse $2) $3 }
-|	'/***' CommentTokens '*/'				{ Comment Block $1 (reverse $2) $3 }
-|	'/**/'							{ CommentBlock $1 }
+:	'/*' CommentTokens '*/'					{ mk $ Comment Regular $1 (reverse $2) $3 }
+|	'/**' CommentTokens '*/'				{ mk $ Comment Doxygen $1 (reverse $2) $3 }
+|	'/***' CommentTokens '*/'				{ mk $ Comment Block $1 (reverse $2) $3 }
+|	'/**/'							{ mk $ CommentBlock $1 }
 
 CommentTokens :: { [StringLexeme] }
 CommentTokens
@@ -284,42 +285,42 @@ CommentWord
 |	'='							{ $1 }
 
 PreprocIfdef(decls)
-:	'#ifdef' ID_CONST decls PreprocElse(decls) '#endif'	{ PreprocIfdef $2 (reverse $3) $4 }
-|	'#ifndef' ID_CONST decls PreprocElse(decls) '#endif'	{ PreprocIfndef $2 (reverse $3) $4 }
+:	'#ifdef' ID_CONST decls PreprocElse(decls) '#endif'	{ mk $ PreprocIfdef $2 (reverse $3) $4 }
+|	'#ifndef' ID_CONST decls PreprocElse(decls) '#endif'	{ mk $ PreprocIfndef $2 (reverse $3) $4 }
 
 PreprocIf(decls)
-:	'#if' PreprocConstExpr '\n' decls PreprocElse(decls) '#endif'	{ PreprocIf $2 (reverse $4) $5 }
+:	'#if' PreprocConstExpr '\n' decls PreprocElse(decls) '#endif'	{ mk $ PreprocIf $2 (reverse $4) $5 }
 
 PreprocElse(decls)
-:								{ PreprocElse [] }
-|	'#else' decls						{ PreprocElse $2 }
-|	'#elif' PreprocConstExpr '\n' decls PreprocElse(decls)	{ PreprocElif $2 (reverse $4) $5 }
+:								{ mk $ PreprocElse [] }
+|	'#else' decls						{ mk $ PreprocElse $2 }
+|	'#elif' PreprocConstExpr '\n' decls PreprocElse(decls)	{ mk $ PreprocElif $2 (reverse $4) $5 }
 
 PreprocInclude :: { StringNode }
 PreprocInclude
-:	'#include' LIT_STRING					{ PreprocInclude $2 }
-|	'#include' LIT_SYS_INCLUDE				{ PreprocInclude $2 }
+:	'#include' LIT_STRING					{ mk $ PreprocInclude $2 }
+|	'#include' LIT_SYS_INCLUDE				{ mk $ PreprocInclude $2 }
 
 PreprocDefine :: { StringNode }
 PreprocDefine
-:	'#define' ID_CONST '\n'					{ PreprocDefine $2 }
-|	'#define' ID_CONST PreprocSafeExpr(ConstExpr) '\n'	{ PreprocDefineConst $2 $3 }
-|	'#define' ID_CONST MacroParamList MacroBody '\n'	{ PreprocDefineMacro $2 $3 $4 }
+:	'#define' ID_CONST '\n'					{ mk $ PreprocDefine $2 }
+|	'#define' ID_CONST PreprocSafeExpr(ConstExpr) '\n'	{ mk $ PreprocDefineConst $2 $3 }
+|	'#define' ID_CONST MacroParamList MacroBody '\n'	{ mk $ PreprocDefineMacro $2 $3 $4 }
 
 PreprocUndef :: { StringNode }
 PreprocUndef
-:	'#undef' ID_CONST					{ PreprocUndef $2 }
+:	'#undef' ID_CONST					{ mk $ PreprocUndef $2 }
 
 PreprocConstExpr :: { StringNode }
 PreprocConstExpr
 :	PureExpr(PreprocConstExpr)				{ $1 }
-|	'defined' '(' ID_CONST ')'				{ PreprocDefined $3 }
+|	'defined' '(' ID_CONST ')'				{ mk $ PreprocDefined $3 }
 
 MacroParamList :: { [StringNode] }
 MacroParamList
 :	'(' ')'							{ [] }
 |	'(' MacroParams ')'					{ reverse $2 }
-|	'(' MacroParams ',' '...' ')'				{ reverse $ Ellipsis : $2 }
+|	'(' MacroParams ',' '...' ')'				{ reverse $ mk Ellipsis : $2 }
 
 MacroParams :: { [StringNode] }
 MacroParams
@@ -328,12 +329,12 @@ MacroParams
 
 MacroParam :: { StringNode }
 MacroParam
-:	IdVar							{ MacroParam $1 }
+:	IdVar							{ mk $ MacroParam $1 }
 
 MacroBody :: { StringNode }
 MacroBody
 :	do CompoundStmt while '(' LIT_INTEGER ')'		{% macroBodyStmt $2 $5 }
-|	FunctionCall						{ MacroBodyFunCall $1 }
+|	FunctionCall						{ mk $ MacroBodyFunCall $1 }
 
 ExternC :: { StringNode }
 ExternC
@@ -354,7 +355,7 @@ Stmt :: { StringNode }
 Stmt
 :	PreprocIfdef(Stmts)					{ $1 }
 |	PreprocIf(Stmts)					{ $1 }
-|	PreprocDefine Stmts PreprocUndef			{ PreprocScopedDefine $1 $2 $3 }
+|	PreprocDefine Stmts PreprocUndef			{ mk $ PreprocScopedDefine $1 $2 $3 }
 |	DeclStmt						{ $1 }
 |	CompoundStmt						{ $1 }
 |	IfStmt							{ $1 }
@@ -364,24 +365,24 @@ Stmt
 |	AssignExpr ';'						{ $1 }
 |	ExprStmt ';'						{ $1 }
 |	FunctionCall ';'					{ $1 }
-|	break ';'						{ Break }
-|	goto ID_CONST ';'					{ Goto $2 }
-|	ID_CONST ':' Stmt					{ Label $1 $3 }
-|	continue ';'						{ Continue }
-|	return ';'						{ Return Nothing }
-|	return Expr ';'						{ Return (Just $2) }
-|	switch '(' Expr ')' '{' SwitchCases '}'			{ SwitchStmt $3 $6 }
+|	break ';'						{ mk $ Break }
+|	goto ID_CONST ';'					{ mk $ Goto $2 }
+|	ID_CONST ':' Stmt					{ mk $ Label $1 $3 }
+|	continue ';'						{ mk $ Continue }
+|	return ';'						{ mk $ Return Nothing }
+|	return Expr ';'						{ mk $ Return (Just $2) }
+|	switch '(' Expr ')' '{' SwitchCases '}'			{ mk $ SwitchStmt $3 $6 }
 |	Comment							{ $1 }
 
 IfStmt :: { StringNode }
 IfStmt
-:	if '(' Expr ')' CompoundStmt				{ IfStmt $3 $5 Nothing }
-|	if '(' Expr ')' CompoundStmt else IfStmt		{ IfStmt $3 $5 (Just $7) }
-|	if '(' Expr ')' CompoundStmt else CompoundStmt		{ IfStmt $3 $5 (Just $7) }
+:	if '(' Expr ')' CompoundStmt				{ mk $ IfStmt $3 $5 Nothing }
+|	if '(' Expr ')' CompoundStmt else IfStmt		{ mk $ IfStmt $3 $5 (Just $7) }
+|	if '(' Expr ')' CompoundStmt else CompoundStmt		{ mk $ IfStmt $3 $5 (Just $7) }
 
 ForStmt :: { StringNode }
 ForStmt
-:	for '(' ForInit Expr ';' ForNext ')' CompoundStmt	{ ForStmt $3 $4 $6 $8 }
+:	for '(' ForInit Expr ';' ForNext ')' CompoundStmt	{ mk $ ForStmt $3 $4 $6 $8 }
 
 ForInit :: { StringNode }
 ForInit
@@ -395,11 +396,11 @@ ForNext
 
 WhileStmt :: { StringNode }
 WhileStmt
-:	while '(' Expr ')' CompoundStmt				{ WhileStmt $3 $5 }
+:	while '(' Expr ')' CompoundStmt				{ mk $ WhileStmt $3 $5 }
 
 DoWhileStmt :: { StringNode }
 DoWhileStmt
-:	do CompoundStmt while '(' Expr ')' ';'			{ DoWhileStmt $2 $5 }
+:	do CompoundStmt while '(' Expr ')' ';'			{ mk $ DoWhileStmt $2 $5 }
 
 SwitchCases :: { [StringNode] }
 SwitchCases
@@ -408,39 +409,39 @@ SwitchCases
 
 SwitchCase :: { StringNode }
 SwitchCase
-:	case Expr ':' SwitchCaseBody				{ Case $2 $4 }
-|	default ':' SwitchCaseBody				{ Default $3 }
+:	case Expr ':' SwitchCaseBody				{ mk $ Case $2 $4 }
+|	default ':' SwitchCaseBody				{ mk $ Default $3 }
 
 SwitchCaseBody :: { StringNode }
 SwitchCaseBody
 :	CompoundStmt						{ $1 }
 |	SwitchCase						{ $1 }
-|	return Expr ';'						{ Return (Just $2) }
+|	return Expr ';'						{ mk $ Return (Just $2) }
 
 DeclStmt :: { StringNode }
 DeclStmt
 :	VarDecl							{ $1 }
-|	VLA '(' QualType ',' IdVar ',' Expr ')' ';'		{ VLA $3 $5 $7 }
+|	VLA '(' QualType ',' IdVar ',' Expr ')' ';'		{ mk $ VLA $3 $5 $7 }
 
 VarDecl :: { StringNode }
 VarDecl
-:	QualType Declarator ';'					{ VarDecl $1 $2 }
+:	QualType Declarator ';'					{ mk $ VarDecl $1 $2 }
 
 Declarator :: { StringNode }
 Declarator
-:	DeclSpec '=' InitialiserExpr				{ Declarator $1 (Just $3) }
-|	DeclSpec						{ Declarator $1 Nothing }
+:	DeclSpec '=' InitialiserExpr				{ mk $ Declarator $1 (Just $3) }
+|	DeclSpec						{ mk $ Declarator $1 Nothing }
 
 InitialiserExpr :: { StringNode }
 InitialiserExpr
-:	InitialiserList						{ InitialiserList $1 }
+:	InitialiserList						{ mk $ InitialiserList $1 }
 |	Expr							{ $1 }
 
 DeclSpec :: { StringNode }
 DeclSpec
-:	IdVar							{ DeclSpecVar $1 }
-|	DeclSpec '[' ']'					{ DeclSpecArray $1 Nothing }
-|	DeclSpec '[' Expr ']'					{ DeclSpecArray $1 (Just $3) }
+:	IdVar							{ mk $ DeclSpecVar $1 }
+|	DeclSpec '[' ']'					{ mk $ DeclSpecArray $1 Nothing }
+|	DeclSpec '[' Expr ']'					{ mk $ DeclSpecArray $1 (Just $3) }
 
 IdVar :: { Lexeme String }
 IdVar
@@ -461,19 +462,19 @@ Initialisers
 Initialiser :: { StringNode }
 Initialiser
 :	Expr							{ $1 }
-|	InitialiserList						{ InitialiserList $1 }
+|	InitialiserList						{ mk $ InitialiserList $1 }
 
 CompoundStmt :: { StringNode }
 CompoundStmt
-:	'{' Stmts '}'						{ CompoundStmt (reverse $2) }
+:	'{' Stmts '}'						{ mk $ CompoundStmt (reverse $2) }
 
 -- Expressions that are safe for use as macro body without () around it..
 PreprocSafeExpr(x)
 :	LiteralExpr						{ $1 }
-|	'(' x ')'						{ ParenExpr $2 }
-|	'(' QualType ')' x %prec CAST				{ CastExpr $2 $4 }
-|	sizeof '(' x ')'					{ SizeofExpr $3 }
-|	sizeof '(' QualType ')'					{ SizeofType $3 }
+|	'(' x ')'						{ mk $ ParenExpr $2 }
+|	'(' QualType ')' x %prec CAST				{ mk $ CastExpr $2 $4 }
+|	sizeof '(' x ')'					{ mk $ SizeofExpr $3 }
+|	sizeof '(' QualType ')'					{ mk $ SizeofType $3 }
 
 ConstExpr :: { StringNode }
 ConstExpr
@@ -481,51 +482,51 @@ ConstExpr
 
 PureExpr(x)
 :	PreprocSafeExpr(x)					{ $1 }
-|	x '!=' x						{ BinaryExpr $1 BopNe $3 }
-|	x '==' x						{ BinaryExpr $1 BopEq $3 }
-|	x '||' x						{ BinaryExpr $1 BopOr $3 }
-|	x '^' x							{ BinaryExpr $1 BopBitXor $3 }
-|	x '|' x							{ BinaryExpr $1 BopBitOr $3 }
-|	x '&&' x						{ BinaryExpr $1 BopAnd $3 }
-|	x '&' x							{ BinaryExpr $1 BopBitAnd $3 }
-|	x '/' x							{ BinaryExpr $1 BopDiv $3 }
-|	x '*' x							{ BinaryExpr $1 BopMul $3 }
-|	x '%' x							{ BinaryExpr $1 BopMod $3 }
-|	x '+' x							{ BinaryExpr $1 BopPlus $3 }
-|	x '-' x							{ BinaryExpr $1 BopMinus $3 }
-|	x '<' x							{ BinaryExpr $1 BopLt $3 }
-|	x '<=' x						{ BinaryExpr $1 BopLe $3 }
-|	x '<<' x						{ BinaryExpr $1 BopLsh $3 }
-|	x '>' x							{ BinaryExpr $1 BopGt $3 }
-|	x '>=' x						{ BinaryExpr $1 BopGe $3 }
-|	x '>>' x						{ BinaryExpr $1 BopRsh $3 }
-|	x '?' x ':' x						{ TernaryExpr $1 $3 $5 }
-|	'!' x							{ UnaryExpr UopNot $2 }
-|	'~' x							{ UnaryExpr UopNeg $2 }
-|	'-' x %prec NEG						{ UnaryExpr UopMinus $2 }
-|	'&' x %prec ADDRESS					{ UnaryExpr UopAddress $2 }
+|	x '!=' x						{ mk $ BinaryExpr $1 BopNe $3 }
+|	x '==' x						{ mk $ BinaryExpr $1 BopEq $3 }
+|	x '||' x						{ mk $ BinaryExpr $1 BopOr $3 }
+|	x '^' x							{ mk $ BinaryExpr $1 BopBitXor $3 }
+|	x '|' x							{ mk $ BinaryExpr $1 BopBitOr $3 }
+|	x '&&' x						{ mk $ BinaryExpr $1 BopAnd $3 }
+|	x '&' x							{ mk $ BinaryExpr $1 BopBitAnd $3 }
+|	x '/' x							{ mk $ BinaryExpr $1 BopDiv $3 }
+|	x '*' x							{ mk $ BinaryExpr $1 BopMul $3 }
+|	x '%' x							{ mk $ BinaryExpr $1 BopMod $3 }
+|	x '+' x							{ mk $ BinaryExpr $1 BopPlus $3 }
+|	x '-' x							{ mk $ BinaryExpr $1 BopMinus $3 }
+|	x '<' x							{ mk $ BinaryExpr $1 BopLt $3 }
+|	x '<=' x						{ mk $ BinaryExpr $1 BopLe $3 }
+|	x '<<' x						{ mk $ BinaryExpr $1 BopLsh $3 }
+|	x '>' x							{ mk $ BinaryExpr $1 BopGt $3 }
+|	x '>=' x						{ mk $ BinaryExpr $1 BopGe $3 }
+|	x '>>' x						{ mk $ BinaryExpr $1 BopRsh $3 }
+|	x '?' x ':' x						{ mk $ TernaryExpr $1 $3 $5 }
+|	'!' x							{ mk $ UnaryExpr UopNot $2 }
+|	'~' x							{ mk $ UnaryExpr UopNeg $2 }
+|	'-' x %prec NEG						{ mk $ UnaryExpr UopMinus $2 }
+|	'&' x %prec ADDRESS					{ mk $ UnaryExpr UopAddress $2 }
 
 LiteralExpr :: { StringNode }
 LiteralExpr
 :	StringLiteralExpr					{ $1 }
-|	LIT_CHAR						{ LiteralExpr Char $1 }
-|	LIT_INTEGER						{ LiteralExpr Int $1 }
-|	LIT_FALSE						{ LiteralExpr Bool $1 }
-|	LIT_TRUE						{ LiteralExpr Bool $1 }
-|	ID_CONST						{ LiteralExpr ConstId $1 }
+|	LIT_CHAR						{ mk $ LiteralExpr Char $1 }
+|	LIT_INTEGER						{ mk $ LiteralExpr Int $1 }
+|	LIT_FALSE						{ mk $ LiteralExpr Bool $1 }
+|	LIT_TRUE						{ mk $ LiteralExpr Bool $1 }
+|	ID_CONST						{ mk $ LiteralExpr ConstId $1 }
 
 StringLiteralExpr :: { StringNode }
 StringLiteralExpr
-:	LIT_STRING						{ LiteralExpr String $1 }
+:	LIT_STRING						{ mk $ LiteralExpr String $1 }
 |	StringLiteralExpr LIT_STRING				{ $1 }
 
 LhsExpr :: { StringNode }
 LhsExpr
-:	IdVar							{ VarExpr $1 }
-|	'*' LhsExpr %prec DEREF					{ UnaryExpr UopDeref $2 }
-|	LhsExpr '.' IdVar					{ MemberAccess $1 $3 }
-|	LhsExpr '->' IdVar					{ PointerAccess $1 $3 }
-|	LhsExpr '[' Expr ']'					{ ArrayAccess $1 $3 }
+:	IdVar							{ mk $ VarExpr $1 }
+|	'*' LhsExpr %prec DEREF					{ mk $ UnaryExpr UopDeref $2 }
+|	LhsExpr '.' IdVar					{ mk $ MemberAccess $1 $3 }
+|	LhsExpr '->' IdVar					{ mk $ PointerAccess $1 $3 }
+|	LhsExpr '[' Expr ']'					{ mk $ ArrayAccess $1 $3 }
 
 Expr :: { StringNode }
 Expr
@@ -538,11 +539,11 @@ Expr
 -- Allow `(Type){0}` to set struct values to all-zero.
 CompoundExpr :: { StringNode }
 CompoundExpr
-:	'(' QualType ')' '{' Expr '}'				{ CompoundExpr $2 $5 }
+:	'(' QualType ')' '{' Expr '}'				{ mk $ CompoundExpr $2 $5 }
 
 AssignExpr :: { StringNode }
 AssignExpr
-:	LhsExpr AssignOperator Expr				{ AssignExpr $1 $2 $3 }
+:	LhsExpr AssignOperator Expr				{ mk $ AssignExpr $1 $2 $3 }
 
 AssignOperator :: { AssignOp }
 AssignOperator
@@ -560,12 +561,12 @@ AssignOperator
 
 ExprStmt :: { StringNode }
 ExprStmt
-:	'++' Expr						{ UnaryExpr UopIncr $2 }
-|	'--' Expr						{ UnaryExpr UopDecr $2 }
+:	'++' Expr						{ mk $ UnaryExpr UopIncr $2 }
+|	'--' Expr						{ mk $ UnaryExpr UopDecr $2 }
 
 FunctionCall :: { StringNode }
 FunctionCall
-:	Expr ArgList						{ FunctionCall $1 $2 }
+:	Expr ArgList						{ mk $ FunctionCall $1 $2 }
 
 ArgList :: { [StringNode] }
 ArgList
@@ -580,15 +581,15 @@ Args
 Arg :: { StringNode }
 Arg
 :	Expr							{ $1 }
-|	Comment Expr						{ CommentExpr $1 $2 }
+|	Comment Expr						{ mk $ CommentExpr $1 $2 }
 
 EnumDecl :: { StringNode }
 EnumDecl
-:	enum class ID_SUE_TYPE EnumeratorList			{ EnumClass $3 $4 }
-|	enum       ID_SUE_TYPE EnumeratorList ';'		{ EnumConsts (Just $2) $3 }
-|	enum                   EnumeratorList ';'		{ EnumConsts Nothing $2 }
-|	typedef enum ID_SUE_TYPE EnumeratorList ID_SUE_TYPE ';'	{ EnumDecl $3 $4 $5 }
-|	bitmask ID_SUE_TYPE EnumeratorList			{ EnumDecl $2 $3 $2 }
+:	enum class ID_SUE_TYPE EnumeratorList			{ mk $ EnumClass $3 $4 }
+|	enum       ID_SUE_TYPE EnumeratorList ';'		{ mk $ EnumConsts (Just $2) $3 }
+|	enum                   EnumeratorList ';'		{ mk $ EnumConsts Nothing $2 }
+|	typedef enum ID_SUE_TYPE EnumeratorList ID_SUE_TYPE ';'	{ mk $ EnumDecl $3 $4 $5 }
+|	bitmask ID_SUE_TYPE EnumeratorList			{ mk $ EnumDecl $2 $3 $2 }
 
 EnumeratorList :: { [StringNode] }
 EnumeratorList
@@ -601,9 +602,9 @@ Enumerators
 
 Enumerator :: { StringNode }
 Enumerator
-:	EnumeratorName ','					{ Enumerator $1 Nothing }
-|	EnumeratorName '=' ConstExpr ','			{ Enumerator $1 (Just $3) }
-|	namespace ID_CONST '{' Enumerators '}'			{ Namespace Global $2 $4 }
+:	EnumeratorName ','					{ mk $ Enumerator $1 Nothing }
+|	EnumeratorName '=' ConstExpr ','			{ mk $ Enumerator $1 (Just $3) }
+|	namespace ID_CONST '{' Enumerators '}'			{ mk $ Namespace Global $2 $4 }
 |	Comment							{ $1 }
 
 EnumeratorName :: { Lexeme String }
@@ -614,14 +615,14 @@ EnumeratorName
 AggregateDecl :: { StringNode }
 AggregateDecl
 :	AggregateType ';'					{ $1 }
-|	class ID_SUE_TYPE TypeParams ';'			{ ClassForward $2 $3 }
-|	typedef AggregateType ID_SUE_TYPE ';'			{ Typedef $2 $3 }
+|	class ID_SUE_TYPE TypeParams ';'			{ mk $ ClassForward $2 $3 }
+|	typedef AggregateType ID_SUE_TYPE ';'			{ mk $ Typedef $2 $3 }
 
 AggregateType :: { StringNode }
 AggregateType
-:	struct ID_SUE_TYPE '{' MemberDeclList '}'		{ Struct $2 $4 }
-|	struct this '{' MemberDeclList '}'			{ Struct $2 $4 }
-|	union ID_SUE_TYPE '{' MemberDeclList '}'		{ Union $2 $4 }
+:	struct ID_SUE_TYPE '{' MemberDeclList '}'		{ mk $ Struct $2 $4 }
+|	struct this '{' MemberDeclList '}'			{ mk $ Struct $2 $4 }
+|	union ID_SUE_TYPE '{' MemberDeclList '}'		{ mk $ Union $2 $4 }
 
 MemberDeclList :: { [StringNode] }
 MemberDeclList
@@ -634,42 +635,42 @@ MemberDecls
 
 MemberDecl :: { StringNode }
 MemberDecl
-:	QualType DeclSpec ';'					{ MemberDecl $1 $2 Nothing }
-|	QualType DeclSpec ':' LIT_INTEGER ';'			{ MemberDecl $1 $2 (Just $4) }
-|	namespace IdVar '{' MemberDeclList '}'			{ Namespace Global $2 $4 }
+:	QualType DeclSpec ';'					{ mk $ MemberDecl $1 $2 Nothing }
+|	QualType DeclSpec ':' LIT_INTEGER ';'			{ mk $ MemberDecl $1 $2 (Just $4) }
+|	namespace IdVar '{' MemberDeclList '}'			{ mk $ Namespace Global $2 $4 }
 |	PreprocIfdef(MemberDeclList)				{ $1 }
 |	Comment							{ $1 }
 
 TypedefDecl :: { StringNode }
 TypedefDecl
-:	typedef QualType ID_SUE_TYPE ';'			{ Typedef $2 $3 }
-|	typedef FunctionPrototype(ID_FUNC_TYPE) ';'		{ TypedefFunction $2 }
+:	typedef QualType ID_SUE_TYPE ';'			{ mk $ Typedef $2 $3 }
+|	typedef FunctionPrototype(ID_FUNC_TYPE) ';'		{ mk $ TypedefFunction $2 }
 
 QualType :: { StringNode }
 QualType
 :	LeafType						{                               $1 }
-|	LeafType '*'						{                     TyPointer $1 }
-|	LeafType '*' '*'					{ TyPointer          (TyPointer $1) }
-|	LeafType '*' const					{            TyConst (TyPointer $1) }
-|	LeafType '*' const '*'					{ TyPointer (TyConst (TyPointer $1)) }
-|	LeafType const						{                                TyConst $1 }
-|	LeafType const '*'					{                     TyPointer (TyConst $1) }
-|	LeafType const '*' const				{            TyConst (TyPointer (TyConst $1)) }
-|	LeafType const '*' const '*'				{ TyPointer (TyConst (TyPointer (TyConst $1))) }
-|	const LeafType						{                                TyConst $2 }
-|	const LeafType '*'					{                     TyPointer (TyConst $2) }
-|	const LeafType '*' const				{            TyConst (TyPointer (TyConst $2)) }
-|	const LeafType '*' const '*'				{ TyPointer (TyConst (TyPointer (TyConst $2))) }
+|	LeafType '*'						{                     tyPointer $1 }
+|	LeafType '*' '*'					{ tyPointer          (tyPointer $1) }
+|	LeafType '*' const					{            tyConst (tyPointer $1) }
+|	LeafType '*' const '*'					{ tyPointer (tyConst (tyPointer $1)) }
+|	LeafType const						{                                tyConst $1 }
+|	LeafType const '*'					{                     tyPointer (tyConst $1) }
+|	LeafType const '*' const				{            tyConst (tyPointer (tyConst $1)) }
+|	LeafType const '*' const '*'				{ tyPointer (tyConst (tyPointer (tyConst $1))) }
+|	const LeafType						{                                tyConst $2 }
+|	const LeafType '*'					{                     tyPointer (tyConst $2) }
+|	const LeafType '*' const				{            tyConst (tyPointer (tyConst $2)) }
+|	const LeafType '*' const '*'				{ tyPointer (tyConst (tyPointer (tyConst $2))) }
 
 LeafType :: { StringNode }
 LeafType
-:	struct ID_SUE_TYPE					{ TyStruct $2 }
-|	void							{ TyStd $1 }
-|	this							{ TyStd $1 }
-|	ID_FUNC_TYPE						{ TyFunc $1 }
-|	ID_STD_TYPE						{ TyStd $1 }
-|	ID_SUE_TYPE						{ TyUserDefined $1 }
-|	ID_TYVAR						{ TyVar $1 }
+:	struct ID_SUE_TYPE					{ mk $ TyStruct $2 }
+|	void							{ mk $ TyStd $1 }
+|	this							{ mk $ TyStd $1 }
+|	ID_FUNC_TYPE						{ mk $ TyFunc $1 }
+|	ID_STD_TYPE						{ mk $ TyStd $1 }
+|	ID_SUE_TYPE						{ mk $ TyUserDefined $1 }
+|	ID_TYVAR						{ mk $ TyVar $1 }
 
 FunctionDecl :: { StringNode }
 FunctionDecl
@@ -678,9 +679,9 @@ FunctionDecl
 
 FunctionDeclarator :: { Scope -> StringNode }
 FunctionDeclarator
-:	FunctionPrototype(IdVar) WithError			{ \s -> FunctionDecl s $1 $2 }
-|	FunctionPrototype(IdVar) CompoundStmt			{ \s -> FunctionDefn s $1 $2 }
-|	QualType DeclSpec '{' Accessors '}'			{ \s -> Property $1 $2 (reverse $4) }
+:	FunctionPrototype(IdVar) WithError			{ \s -> mk $ FunctionDecl s $1 $2 }
+|	FunctionPrototype(IdVar) CompoundStmt			{ \s -> mk $ FunctionDefn s $1 $2 }
+|	QualType DeclSpec '{' Accessors '}'			{ \s -> mk $ Property $1 $2 (reverse $4) }
 
 Accessors :: { [StringNode] }
 Accessors
@@ -689,25 +690,25 @@ Accessors
 
 Accessor :: { StringNode }
 Accessor
-:	IdVar FunctionParamList WithError			{ Accessor $1 $2 $3 }
+:	IdVar FunctionParamList WithError			{ mk $ Accessor $1 $2 $3 }
 |	Comment							{ $1 }
 
 WithError :: { Maybe StringNode }
 WithError
 :	';'							{ Nothing }
-|	with 'error' EnumeratorList				{ Just (ErrorList $3) }
-|	with 'error' for IdVar ';'				{ Just (ErrorFor $4) }
+|	with 'error' EnumeratorList				{ Just (mk $ ErrorList $3) }
+|	with 'error' for IdVar ';'				{ Just (mk $ ErrorFor $4) }
 
 FunctionPrototype(id)
-:	QualType id FunctionParamList				{ FunctionPrototype $1 $2 $3 }
-|	QualType id FunctionParamList const			{ FunctionPrototype $1 $2 $3 }
+:	QualType id FunctionParamList				{ mk $ FunctionPrototype $1 $2 $3 }
+|	QualType id FunctionParamList const			{ mk $ FunctionPrototype $1 $2 $3 }
 
 FunctionParamList :: { [StringNode] }
 FunctionParamList
 :	'(' ')'							{ [] }
-|	'(' void ')'						{ [TyStd $2] }
+|	'(' void ')'						{ [mk $ TyStd $2] }
 |	'(' FunctionParams ')'					{ reverse $2 }
-|	'(' FunctionParams ',' '...' ')'			{ reverse $ Ellipsis : $2 }
+|	'(' FunctionParams ',' '...' ')'			{ reverse $ mk Ellipsis : $2 }
 
 FunctionParams :: { [StringNode] }
 FunctionParams
@@ -716,17 +717,23 @@ FunctionParams
 
 FunctionParam :: { StringNode }
 FunctionParam
-:	QualType DeclSpec					{ FunctionParam $1 $2 }
+:	QualType DeclSpec					{ mk $ FunctionParam $1 $2 }
 
 ConstDecl :: { StringNode }
 ConstDecl
-:	extern const LeafType ID_VAR ';'			{ ConstDecl $3 $4 }
-|	const LeafType ID_VAR '=' InitialiserExpr ';'		{ ConstDefn Global $2 $3 $5 }
-|	static const LeafType ID_VAR '=' InitialiserExpr ';'	{ ConstDefn Static $3 $4 $6 }
+:	extern const LeafType ID_VAR ';'			{ mk $ ConstDecl $3 $4 }
+|	const LeafType ID_VAR '=' InitialiserExpr ';'		{ mk $ ConstDefn Global $2 $3 $5 }
+|	static const LeafType ID_VAR '=' InitialiserExpr ';'	{ mk $ ConstDefn Static $3 $4 $6 }
 
 {
 type StringLexeme = Lexeme String
-type StringNode = Node () StringLexeme
+type StringNode = Identity (Node Identity () StringLexeme)
+
+mk :: a -> Identity a
+mk = Identity
+
+tyPointer = mk . TyPointer
+tyConst = mk . TyConst
 
 parseError :: Show text => (Lexeme text, [String]) -> Alex a
 parseError (L (AlexPn _ line col) c t, options) =
@@ -743,7 +750,7 @@ externC
     -> Lexeme String
     -> Alex StringNode
 externC (L _ _ "__cplusplus") (L _ _ "\"C\"") decls (L _ _ "__cplusplus") =
-    return $ ExternC decls
+    return $ mk $ ExternC decls
 externC _ lang _ _ =
     alexError $ show lang
         <> ": extern \"C\" declaration invalid (did you spell __cplusplus right?)"
@@ -753,7 +760,7 @@ macroBodyStmt
     -> Lexeme String
     -> Alex StringNode
 macroBodyStmt decls (L _ _ "0") =
-    return $ MacroBodyStmt decls
+    return $ mk $ MacroBodyStmt decls
 macroBodyStmt _ cond =
     alexError $ show cond
         <> ": macro do-while body must end in 'while (0)'"

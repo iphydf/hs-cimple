@@ -9,6 +9,7 @@ module Language.Cimple.IO
 import           Control.Monad                   ((>=>))
 import           Control.Monad.State.Lazy        (State, evalState, get, put)
 import qualified Data.ByteString                 as BS
+import           Data.Functor.Identity           (Identity)
 import           Data.Map.Strict                 (Map)
 import qualified Data.Map.Strict                 as Map
 import           Data.Text                       (Text)
@@ -24,8 +25,8 @@ import           Language.Cimple.TraverseAst     (TextActions, textActions,
                                                   traverseAst)
 import qualified Language.Cimple.TreeParser      as TreeParser
 
-type StringNode = Node () (Lexeme String)
-type TextNode = Node () (Lexeme Text)
+type StringNode = Node Identity () (Lexeme String)
+type TextNode = Node Identity () (Lexeme Text)
 
 toTextAst :: [StringNode] -> [TextNode]
 toTextAst stringAst =

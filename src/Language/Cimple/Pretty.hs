@@ -1,5 +1,7 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Language.Cimple.Pretty (ppTranslationUnit) where
 
+import           Data.Functor.Identity        (Identity)
 import qualified Data.List                    as List
 import           Data.Text                    (Text)
 import qualified Data.Text                    as Text
@@ -75,7 +77,7 @@ ppScope :: Scope -> Doc
 ppScope Global = empty
 ppScope Static = text "static "
 
-ppType :: Show a => Node a (Lexeme Text) -> Doc
+ppType :: Show a => Node Identity a (Lexeme Text) -> Doc
 ppType (TyPointer     ty) = ppType ty <> char '*'
 ppType (TyConst       ty) = ppType ty <+> text "const"
 ppType (TyUserDefined l ) = ppLexeme l
@@ -130,10 +132,10 @@ ppUnaryOp op = case op of
     UopIncr    -> text "++"
     UopDecr    -> text "--"
 
-ppInitialiserList :: Show a => [Node a (Lexeme Text)] -> Doc
+ppInitialiserList :: Show a => [Node Identity a (Lexeme Text)] -> Doc
 ppInitialiserList l = char '{' <+> ppCommaSep ppExpr l <+> char '}'
 
-ppDeclSpec :: Show a => Node a (Lexeme Text) -> Doc
+ppDeclSpec :: Show a => Node Identity a (Lexeme Text) -> Doc
 ppDeclSpec (DeclSpecVar var        ) = ppLexeme var
 ppDeclSpec (DeclSpecArray dspec dim) = ppDeclSpec dspec <> ppDim dim
   where
@@ -141,14 +143,14 @@ ppDeclSpec (DeclSpecArray dspec dim) = ppDeclSpec dspec <> ppDim dim
     ppDim (Just x) = char '[' <> ppExpr x <> char ']'
 ppDeclSpec x = error $ groom x
 
-ppDeclarator :: Show a => Node a (Lexeme Text) -> Doc
+ppDeclarator :: Show a => Node Identity a (Lexeme Text) -> Doc
 ppDeclarator (Declarator dspec Nothing) =
     ppDeclSpec dspec
 ppDeclarator (Declarator dspec (Just initr)) =
     ppDeclSpec dspec <+> char '=' <+> ppExpr initr
 ppDeclarator x = error $ groom x
 
-ppFunctionParamList :: Show a => [Node a (Lexeme Text)] -> Doc
+ppFunctionParamList :: Show a => [Node Identity a (Lexeme Text)] -> Doc
 ppFunctionParamList xs = char '(' <> ppCommaSep go xs <> char ')'
   where
     go (TyStd l@(L _ KwVoid _)) = ppLexeme l
@@ -158,14 +160,14 @@ ppFunctionParamList xs = char '(' <> ppCommaSep go xs <> char ')'
 
 ppFunctionPrototype
     :: Show a
-    => Node a (Lexeme Text)
+    => Node Identity a (Lexeme Text)
     -> Lexeme Text
-    -> [Node a (Lexeme Text)]
+    -> [Node Identity a (Lexeme Text)]
     -> Doc
 ppFunctionPrototype ty name params =
     ppType ty <+> ppLexeme name <> ppFunctionParamList params
 
-ppWithError :: Show a => Maybe (Node a (Lexeme Text)) -> Doc
+ppWithError :: Show a => Maybe (Node Identity a (Lexeme Text)) -> Doc
 ppWithError Nothing = char ';'
 ppWithError (Just (ErrorFor name)) =
     text " with error for" <+> ppLexeme name <> char ';'
@@ -176,11 +178,11 @@ ppWithError (Just (ErrorList errs)) =
     ) <$> char '}'
 ppWithError x = error $ groom x
 
-ppFunctionCall :: Show a => Node a (Lexeme Text) -> [Node a (Lexeme Text)] -> Doc
+ppFunctionCall :: Show a => Node Identity a (Lexeme Text) -> [Node Identity a (Lexeme Text)] -> Doc
 ppFunctionCall callee args =
     ppExpr callee <> char '(' <> ppCommaSep ppExpr args <> char ')'
 
-ppMacroBody :: Show a => Node a (Lexeme Text) -> Doc
+ppMacroBody :: Show a => Node Identity a (Lexeme Text) -> Doc
 ppMacroBody (MacroBodyFunCall e@FunctionCall{}) = ppExpr e
 ppMacroBody (MacroBodyStmt (CompoundStmt body)) =
     nest 2 (
@@ -189,12 +191,12 @@ ppMacroBody (MacroBodyStmt (CompoundStmt body)) =
     ) <$> text "} while (0)"
 ppMacroBody x = error $ groom x
 
-ppMacroParam :: Show a => Node a (Lexeme Text) -> Doc
+ppMacroParam :: Show a => Node Identity a (Lexeme Text) -> Doc
 ppMacroParam (MacroParam l) = ppLexeme l
 ppMacroParam Ellipsis       = text "..."
 ppMacroParam x              = error $ groom x
 
-ppMacroParamList :: Show a => [Node a (Lexeme Text)] -> Doc
+ppMacroParamList :: Show a => [Node Identity a (Lexeme Text)] -> Doc
 ppMacroParamList xs = char '(' <> ppCommaSep ppMacroParam xs <> char ')'
 
 ppNamespace :: ([a] -> Doc) -> Scope -> Lexeme Text -> [a] -> Doc
@@ -205,7 +207,7 @@ ppNamespace pp scope name members =
         pp members
     ) <$> char '}'
 
-ppEnumerator :: Show a => Node a (Lexeme Text) -> Doc
+ppEnumerator :: Show a => Node Identity a (Lexeme Text) -> Doc
 ppEnumerator (Comment    style _ cs _ ) = ppComment style cs
 ppEnumerator (Enumerator name  Nothing) = ppLexeme name <> char ','
 ppEnumerator (Enumerator name (Just value)) =
@@ -214,53 +216,53 @@ ppEnumerator (Namespace scope name members) =
     ppNamespace ppEnumeratorList scope name members
 ppEnumerator x = error $ groom x
 
-ppEnumeratorList :: Show a => [Node a (Lexeme Text)] -> Doc
+ppEnumeratorList :: Show a => [Node Identity a (Lexeme Text)] -> Doc
 ppEnumeratorList = ppLineSep ppEnumerator
 
-ppMemberDecl :: Show a => Node a (Lexeme Text) -> Doc
+ppMemberDecl :: Show a => Node Identity a (Lexeme Text) -> Doc
 ppMemberDecl = ppDecl
 
-ppMemberDeclList :: Show a => [Node a (Lexeme Text)] -> Doc
+ppMemberDeclList :: Show a => [Node Identity a (Lexeme Text)] -> Doc
 ppMemberDeclList = ppLineSep ppMemberDecl
 
-ppAccessor :: Show a => Node a (Lexeme Text) -> Doc
+ppAccessor :: Show a => Node Identity a (Lexeme Text) -> Doc
 ppAccessor (Comment style _ cs _) = ppComment style cs
 ppAccessor (Accessor name params errs) =
     ppLexeme name <> ppFunctionParamList params <> ppWithError errs
 ppAccessor x = error $ groom x
 
-ppAccessorList :: Show a => [Node a (Lexeme Text)] -> Doc
+ppAccessorList :: Show a => [Node Identity a (Lexeme Text)] -> Doc
 ppAccessorList = ppLineSep ppAccessor
 
-ppEventType :: Show a => Node a (Lexeme Text) -> Doc
+ppEventType :: Show a => Node Identity a (Lexeme Text) -> Doc
 ppEventType (Commented (Comment style _ cs _) ty) =
     ppComment style cs <$> ppEventType ty
 ppEventType (EventParams params) =
     text "typedef void" <> ppFunctionParamList params
 ppEventType x = error $ groom x
 
-ppTypeParams :: Show a => [Node a (Lexeme Text)] -> Doc
+ppTypeParams :: Show a => [Node Identity a (Lexeme Text)] -> Doc
 ppTypeParams [] = empty
 ppTypeParams xs = char '<' <> ppCommaSep pp xs <> char '>'
   where
     pp (TyVar x) = ppLexeme x
     pp x         = error $ groom x
 
-ppCompoundStmt :: Show a => [Node a (Lexeme Text)] -> Doc
+ppCompoundStmt :: Show a => [Node Identity a (Lexeme Text)] -> Doc
 ppCompoundStmt body =
     nest 2 (
         char '{' <$>
         ppStmtList body
     ) <$> char '}'
 
-ppStmtList :: Show a => [Node a (Lexeme Text)] -> Doc
+ppStmtList :: Show a => [Node Identity a (Lexeme Text)] -> Doc
 ppStmtList = ppLineSep ppDecl
 
 ppIfStmt
     :: Show a
-    => Node a (Lexeme Text)
-    -> [Node a (Lexeme Text)]
-    -> Maybe (Node a (Lexeme Text))
+    => Node Identity a (Lexeme Text)
+    -> [Node Identity a (Lexeme Text)]
+    -> Maybe (Node Identity a (Lexeme Text))
     -> Doc
 ppIfStmt cond t Nothing =
     nest 2 (
@@ -275,10 +277,10 @@ ppIfStmt cond t (Just e) =
 
 ppForStmt
     :: Show a
-    => Node a (Lexeme Text)
-    -> Node a (Lexeme Text)
-    -> Node a (Lexeme Text)
-    -> [Node a (Lexeme Text)]
+    => Node Identity a (Lexeme Text)
+    -> Node Identity a (Lexeme Text)
+    -> Node Identity a (Lexeme Text)
+    -> [Node Identity a (Lexeme Text)]
     -> Doc
 ppForStmt i c n body =
     nest 2 (
@@ -292,8 +294,8 @@ ppForStmt i c n body =
 
 ppWhileStmt
     :: Show a
-    => Node a (Lexeme Text)
-    -> [Node a (Lexeme Text)]
+    => Node Identity a (Lexeme Text)
+    -> [Node Identity a (Lexeme Text)]
     -> Doc
 ppWhileStmt c body =
     nest 2 (
@@ -305,8 +307,8 @@ ppWhileStmt c body =
 
 ppDoWhileStmt
     :: Show a
-    => [Node a (Lexeme Text)]
-    -> Node a (Lexeme Text)
+    => [Node Identity a (Lexeme Text)]
+    -> Node Identity a (Lexeme Text)
     -> Doc
 ppDoWhileStmt body c =
     nest 2 (
@@ -317,8 +319,8 @@ ppDoWhileStmt body c =
 
 ppSwitchStmt
     :: Show a
-    => Node a (Lexeme Text)
-    -> [Node a (Lexeme Text)]
+    => Node Identity a (Lexeme Text)
+    -> [Node Identity a (Lexeme Text)]
     -> Doc
 ppSwitchStmt c body =
     nest 2 (
@@ -328,7 +330,7 @@ ppSwitchStmt c body =
         ppStmtList body
     ) <$> char '}'
 
-ppExpr :: Show a => Node a (Lexeme Text) -> Doc
+ppExpr :: Show a => Node Identity a (Lexeme Text) -> Doc
 ppExpr expr = case expr of
     -- Expressions
     VarExpr var       -> ppLexeme var
@@ -354,16 +356,16 @@ ppExpr expr = case expr of
     x                 -> error $ groom x
 
 ppTernaryExpr
-    :: Show a => Node a (Lexeme Text) -> Node a (Lexeme Text) -> Node a (Lexeme Text) -> Doc
+    :: Show a => Node Identity a (Lexeme Text) -> Node Identity a (Lexeme Text) -> Node Identity a (Lexeme Text) -> Doc
 ppTernaryExpr c t e =
     ppExpr c <+> char '?' <+> ppExpr t <+> char ':' <+> ppExpr e
 
-ppLicenseDecl :: Show a => Lexeme Text -> [Node a (Lexeme Text)] -> Doc
+ppLicenseDecl :: Show a => Lexeme Text -> [Node Identity a (Lexeme Text)] -> Doc
 ppLicenseDecl l cs =
     ppCommentStyle Regular <+> ppLexeme l <$>
     ppLineSep ppCopyrightDecl cs
 
-ppCopyrightDecl :: Show a => Node a (Lexeme Text) -> Doc
+ppCopyrightDecl :: Show a => Node Identity a (Lexeme Text) -> Doc
 ppCopyrightDecl (CopyrightDecl from (Just to) owner) =
     ppLexeme from <> char '-' <> ppLexeme to <+>
     ppCommentBody owner
@@ -373,18 +375,18 @@ ppCopyrightDecl (CopyrightDecl from Nothing owner) =
 ppCopyrightDecl x =
     error $ groom x
 
-ppCommentExpr :: Show a => Node a (Lexeme Text) -> Node a (Lexeme Text) -> Doc
+ppCommentExpr :: Show a => Node Identity a (Lexeme Text) -> Node Identity a (Lexeme Text) -> Doc
 ppCommentExpr (Comment style _ body _) e =
     ppCommentStyle style <+> ppCommentBody body <+> text "*/" <+> ppExpr e
 ppCommentExpr c _ = error $ groom c
 
-ppStmt :: Show a => Node a (Lexeme Text) -> Doc
+ppStmt :: Show a => Node Identity a (Lexeme Text) -> Doc
 ppStmt = ppDecl
 
-ppDeclList :: Show a => [Node a (Lexeme Text)] -> Doc
+ppDeclList :: Show a => [Node Identity a (Lexeme Text)] -> Doc
 ppDeclList = ppLineSep ppDecl
 
-ppDecl :: Show a => Node a (Lexeme Text) -> Doc
+ppDecl :: Show a => Node Identity a (Lexeme Text) -> Doc
 ppDecl decl = case decl of
     PreprocElif cond decls (PreprocElse []) ->
         text "#elif" <+> ppExpr cond <$>
@@ -573,7 +575,7 @@ ppDecl decl = case decl of
     x                                 -> ppExpr x <> char ';'
 
 
-ppVLA :: Show a => Node a (Lexeme Text) -> Lexeme Text -> Node a (Lexeme Text) -> Doc
+ppVLA :: Show a => Node Identity a (Lexeme Text) -> Lexeme Text -> Node Identity a (Lexeme Text) -> Doc
 ppVLA ty n sz =
     text "VLA("
         <> ppType ty
@@ -583,5 +585,5 @@ ppVLA ty n sz =
         <> ppExpr sz
         <> text ");"
 
-ppTranslationUnit :: Show a => [Node a (Lexeme Text)] -> Doc
+ppTranslationUnit :: Show a => [Node Identity a (Lexeme Text)] -> Doc
 ppTranslationUnit decls = ppDeclList decls <> linebreak

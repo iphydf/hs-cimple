@@ -1,7 +1,9 @@
-{-# LANGUAGE DeriveFunctor     #-}
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE StrictData        #-}
+{-# LANGUAGE DeriveFunctor      #-}
+{-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE DeriveTraversable  #-}
+{-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE StrictData         #-}
 module Language.Cimple.AST
     ( AssignOp (..)
     , BinaryOp (..)
@@ -12,114 +14,118 @@ module Language.Cimple.AST
     , CommentStyle (..)
     ) where
 
-import           Data.Aeson   (FromJSON, ToJSON)
-import           GHC.Generics (Generic)
+import           Data.Aeson            (FromJSON, ToJSON)
+import           Data.Functor.Identity (Identity)
+import           GHC.Generics          (Generic)
 
-data Node attr lexeme
-    = Attr attr (Node attr lexeme)
+data Node f attr lexeme
+    = Attr attr (f (Node f attr lexeme))
     -- Preprocessor
     | PreprocInclude lexeme
     | PreprocDefine lexeme
-    | PreprocDefineConst lexeme (Node attr lexeme)
-    | PreprocDefineMacro lexeme [Node attr lexeme] (Node attr lexeme)
-    | PreprocIf (Node attr lexeme) [Node attr lexeme] (Node attr lexeme)
-    | PreprocIfdef lexeme [Node attr lexeme] (Node attr lexeme)
-    | PreprocIfndef lexeme [Node attr lexeme] (Node attr lexeme)
-    | PreprocElse [Node attr lexeme]
-    | PreprocElif (Node attr lexeme) [Node attr lexeme] (Node attr lexeme)
+    | PreprocDefineConst lexeme (f (Node f attr lexeme))
+    | PreprocDefineMacro lexeme ([f (Node f attr lexeme)]) (f (Node f attr lexeme))
+    | PreprocIf (f (Node f attr lexeme)) [f (Node f attr lexeme)] (f (Node f attr lexeme))
+    | PreprocIfdef lexeme [f (Node f attr lexeme)] (f (Node f attr lexeme))
+    | PreprocIfndef lexeme [f (Node f attr lexeme)] (f (Node f attr lexeme))
+    | PreprocElse [f (Node f attr lexeme)]
+    | PreprocElif (f (Node f attr lexeme)) [f (Node f attr lexeme)] (f (Node f attr lexeme))
     | PreprocUndef lexeme
     | PreprocDefined lexeme
-    | PreprocScopedDefine (Node attr lexeme) [Node attr lexeme] (Node attr lexeme)
-    | MacroBodyStmt (Node attr lexeme)
-    | MacroBodyFunCall (Node attr lexeme)
+    | PreprocScopedDefine (f (Node f attr lexeme)) [f (Node f attr lexeme)] (f (Node f attr lexeme))
+    | MacroBodyStmt (f (Node f attr lexeme))
+    | MacroBodyFunCall (f (Node f attr lexeme))
     | MacroParam lexeme
-    | StaticAssert (Node attr lexeme) lexeme
+    | StaticAssert (f (Node f attr lexeme)) lexeme
     -- Comments
-    | LicenseDecl lexeme [Node attr lexeme]
+    | LicenseDecl lexeme [f (Node f attr lexeme)]
     | CopyrightDecl lexeme (Maybe lexeme) [lexeme]
     | Comment CommentStyle lexeme [lexeme] lexeme
     | CommentBlock lexeme
-    | Commented (Node attr lexeme) (Node attr lexeme)
+    | Commented (f (Node f attr lexeme)) (f (Node f attr lexeme))
     -- Namespace-like blocks
-    | ExternC [Node attr lexeme]
-    | Class Scope lexeme [Node attr lexeme] [Node attr lexeme]
-    | Namespace Scope lexeme [Node attr lexeme]
+    | ExternC [f (Node f attr lexeme)]
+    | Class Scope lexeme [f (Node f attr lexeme)] [f (Node f attr lexeme)]
+    | Namespace Scope lexeme [f (Node f attr lexeme)]
     -- Statements
-    | CompoundStmt [Node attr lexeme]
+    | CompoundStmt [f (Node f attr lexeme)]
     | Break
     | Goto lexeme
     | Continue
-    | Return (Maybe (Node attr lexeme))
-    | SwitchStmt (Node attr lexeme) [Node attr lexeme]
-    | IfStmt (Node attr lexeme) (Node attr lexeme) (Maybe (Node attr lexeme))
-    | ForStmt (Node attr lexeme) (Node attr lexeme) (Node attr lexeme) (Node attr lexeme)
-    | WhileStmt (Node attr lexeme) (Node attr lexeme)
-    | DoWhileStmt (Node attr lexeme) (Node attr lexeme)
-    | Case (Node attr lexeme) (Node attr lexeme)
-    | Default (Node attr lexeme)
-    | Label lexeme (Node attr lexeme)
+    | Return (Maybe (f (Node f attr lexeme)))
+    | SwitchStmt (f (Node f attr lexeme)) [f (Node f attr lexeme)]
+    | IfStmt (f (Node f attr lexeme)) (f (Node f attr lexeme)) (Maybe (f (Node f attr lexeme)))
+    | ForStmt (f (Node f attr lexeme)) (f (Node f attr lexeme)) (f (Node f attr lexeme)) (f (Node f attr lexeme))
+    | WhileStmt (f (Node f attr lexeme)) (f (Node f attr lexeme))
+    | DoWhileStmt (f (Node f attr lexeme)) (f (Node f attr lexeme))
+    | Case (f (Node f attr lexeme)) (f (Node f attr lexeme))
+    | Default (f (Node f attr lexeme))
+    | Label lexeme (f (Node f attr lexeme))
     -- Variable declarations
-    | VLA (Node attr lexeme) lexeme (Node attr lexeme)
-    | VarDecl (Node attr lexeme) (Node attr lexeme)
-    | Declarator (Node attr lexeme) (Maybe (Node attr lexeme))
+    | VLA (f (Node f attr lexeme)) lexeme (f (Node f attr lexeme))
+    | VarDecl (f (Node f attr lexeme)) (f (Node f attr lexeme))
+    | Declarator (f (Node f attr lexeme)) (Maybe (f (Node f attr lexeme)))
     | DeclSpecVar lexeme
-    | DeclSpecArray (Node attr lexeme) (Maybe (Node attr lexeme))
+    | DeclSpecArray (f (Node f attr lexeme)) (Maybe (f (Node f attr lexeme)))
     -- Expressions
-    | InitialiserList [Node attr lexeme]
-    | UnaryExpr UnaryOp (Node attr lexeme)
-    | BinaryExpr (Node attr lexeme) BinaryOp (Node attr lexeme)
-    | TernaryExpr (Node attr lexeme) (Node attr lexeme) (Node attr lexeme)
-    | AssignExpr (Node attr lexeme) AssignOp (Node attr lexeme)
-    | ParenExpr (Node attr lexeme)
-    | CastExpr (Node attr lexeme) (Node attr lexeme)
-    | CompoundExpr (Node attr lexeme) (Node attr lexeme)
-    | SizeofExpr (Node attr lexeme)
-    | SizeofType (Node attr lexeme)
+    | InitialiserList [f (Node f attr lexeme)]
+    | UnaryExpr UnaryOp (f (Node f attr lexeme))
+    | BinaryExpr (f (Node f attr lexeme)) BinaryOp (f (Node f attr lexeme))
+    | TernaryExpr (f (Node f attr lexeme)) (f (Node f attr lexeme)) (f (Node f attr lexeme))
+    | AssignExpr (f (Node f attr lexeme)) AssignOp (f (Node f attr lexeme))
+    | ParenExpr (f (Node f attr lexeme))
+    | CastExpr (f (Node f attr lexeme)) (f (Node f attr lexeme))
+    | CompoundExpr (f (Node f attr lexeme)) (f (Node f attr lexeme))
+    | SizeofExpr (f (Node f attr lexeme))
+    | SizeofType (f (Node f attr lexeme))
     | LiteralExpr LiteralType lexeme
     | VarExpr lexeme
-    | MemberAccess (Node attr lexeme) lexeme
-    | PointerAccess (Node attr lexeme) lexeme
-    | ArrayAccess (Node attr lexeme) (Node attr lexeme)
-    | FunctionCall (Node attr lexeme) [Node attr lexeme]
-    | CommentExpr (Node attr lexeme) (Node attr lexeme)
+    | MemberAccess (f (Node f attr lexeme)) lexeme
+    | PointerAccess (f (Node f attr lexeme)) lexeme
+    | ArrayAccess (f (Node f attr lexeme)) (f (Node f attr lexeme))
+    | FunctionCall (f (Node f attr lexeme)) [f (Node f attr lexeme)]
+    | CommentExpr (f (Node f attr lexeme)) (f (Node f attr lexeme))
     -- Type definitions
-    | EnumClass lexeme [Node attr lexeme]
-    | EnumConsts (Maybe lexeme) [Node attr lexeme]
-    | EnumDecl lexeme [Node attr lexeme] lexeme
-    | Enumerator lexeme (Maybe (Node attr lexeme))
-    | ClassForward lexeme [Node attr lexeme]
-    | Typedef (Node attr lexeme) lexeme
-    | TypedefFunction (Node attr lexeme)
-    | Struct lexeme [Node attr lexeme]
-    | Union lexeme [Node attr lexeme]
-    | MemberDecl (Node attr lexeme) (Node attr lexeme) (Maybe lexeme)
-    | TyConst (Node attr lexeme)
-    | TyPointer (Node attr lexeme)
+    | EnumClass lexeme [f (Node f attr lexeme)]
+    | EnumConsts (Maybe lexeme) [f (Node f attr lexeme)]
+    | EnumDecl lexeme [f (Node f attr lexeme)] lexeme
+    | Enumerator lexeme (Maybe (f (Node f attr lexeme)))
+    | ClassForward lexeme [f (Node f attr lexeme)]
+    | Typedef (f (Node f attr lexeme)) lexeme
+    | TypedefFunction (f (Node f attr lexeme))
+    | Struct lexeme [f (Node f attr lexeme)]
+    | Union lexeme [f (Node f attr lexeme)]
+    | MemberDecl (f (Node f attr lexeme)) (f (Node f attr lexeme)) (Maybe lexeme)
+    | TyConst (f (Node f attr lexeme))
+    | TyPointer (f (Node f attr lexeme))
     | TyStruct lexeme
     | TyFunc lexeme
     | TyStd lexeme
     | TyVar lexeme
     | TyUserDefined lexeme
     -- Functions
-    | FunctionDecl Scope (Node attr lexeme) (Maybe (Node attr lexeme))
-    | FunctionDefn Scope (Node attr lexeme) (Node attr lexeme)
-    | FunctionPrototype (Node attr lexeme) lexeme [Node attr lexeme]
-    | FunctionParam (Node attr lexeme) (Node attr lexeme)
-    | Event lexeme (Node attr lexeme)
-    | EventParams [Node attr lexeme]
-    | Property (Node attr lexeme) (Node attr lexeme) [Node attr lexeme]
-    | Accessor lexeme [Node attr lexeme] (Maybe (Node attr lexeme))
-    | ErrorDecl lexeme [Node attr lexeme]
-    | ErrorList [Node attr lexeme]
+    | FunctionDecl Scope (f (Node f attr lexeme)) (Maybe (f (Node f attr lexeme)))
+    | FunctionDefn Scope (f (Node f attr lexeme)) (f (Node f attr lexeme))
+    | FunctionPrototype (f (Node f attr lexeme)) lexeme [f (Node f attr lexeme)]
+    | FunctionParam (f (Node f attr lexeme)) (f (Node f attr lexeme))
+    | Event lexeme (f (Node f attr lexeme))
+    | EventParams [f (Node f attr lexeme)]
+    | Property (f (Node f attr lexeme)) (f (Node f attr lexeme)) [f (Node f attr lexeme)]
+    | Accessor lexeme [f (Node f attr lexeme)] (Maybe (f (Node f attr lexeme)))
+    | ErrorDecl lexeme [f (Node f attr lexeme)]
+    | ErrorList [f (Node f attr lexeme)]
     | ErrorFor lexeme
     | Ellipsis
     -- Constants
-    | ConstDecl (Node attr lexeme) lexeme
-    | ConstDefn Scope (Node attr lexeme) lexeme (Node attr lexeme)
-    deriving (Show, Eq, Generic, Functor, Foldable, Traversable)
+    | ConstDecl (f (Node f attr lexeme)) lexeme
+    | ConstDefn Scope (f (Node f attr lexeme)) lexeme (f (Node f attr lexeme))
+    deriving (Generic, Functor, Foldable, Traversable)
 
-instance (FromJSON attr, FromJSON lexeme) => FromJSON (Node attr lexeme)
-instance (ToJSON attr, ToJSON lexeme) => ToJSON (Node attr lexeme)
+deriving instance (Show attr, Show lexeme) => Show (Node Identity attr lexeme)
+deriving instance (Eq attr, Eq lexeme) => Eq (Node Identity attr lexeme)
+
+instance (FromJSON attr, FromJSON lexeme) => FromJSON (Node Identity attr lexeme)
+instance (ToJSON attr, ToJSON lexeme) => ToJSON (Node Identity attr lexeme)
 
 data AssignOp
     = AopEq

@@ -6,6 +6,7 @@ module Language.Cimple.TreeParser
     , toEither
     ) where
 
+import           Data.Functor.Identity (Identity)
 import           Data.Text             (Text)
 import           Language.Cimple.AST   (CommentStyle (..), Node (..))
 import           Language.Cimple.Lexer (Lexeme)
@@ -213,7 +214,7 @@ CommentableDecl
 
 {
 type TextLexeme = Lexeme Text
-type TextNode = Node () TextLexeme
+type TextNode = Node Identity () TextLexeme
 
 newtype TreeParser a = TreeParser { toEither :: Either String a }
     deriving (Functor, Applicative, Monad)

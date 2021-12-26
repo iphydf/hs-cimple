@@ -7,6 +7,7 @@ module Language.Cimple.Program
   , includeGraph
   ) where
 
+import           Data.Functor.Identity             (Identity)
 import           Data.Map.Strict                   (Map)
 import qualified Data.Map.Strict                   as Map
 import           Data.Text                         (Text)
@@ -20,7 +21,7 @@ import           Language.Cimple.TranslationUnit   (TranslationUnit)
 
 
 data Program text = Program
-  { progAsts     :: Map FilePath [Node () (Lexeme text)]
+  { progAsts     :: Map FilePath [Node Identity () (Lexeme text)]
   , progIncludes :: Graph () FilePath
   }
 
