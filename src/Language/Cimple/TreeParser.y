@@ -4,15 +4,17 @@
 module Language.Cimple.TreeParser (parseTranslationUnit) where
 
 import           Data.Fix                      (Fix (..))
-import           Data.Maybe                    (maybeToList)
+import           Data.Maybe                    (maybeToList, fromJust)
+import qualified Data.Map                      as Map
 import           Data.Text                     (Text)
 import qualified Data.Text                     as Text
-import           Language.Cimple.Ast           (CommentStyle (..), Node,
-                                                NodeF (..))
-import           Language.Cimple.CommentParser (parseComment)
+import           Language.Cimple.Ast           (Comment, CommentStyle (..),
+                                                Node, NodeF (..))
+import           Language.Cimple.CommentParser (GLRResult (..), decode,
+                                                parseComment)
 import           Language.Cimple.DescribeAst   (describeNode, sloc)
 import           Language.Cimple.Lexer         (Lexeme (..))
-import           Language.Cimple.ParseResult   (ParseResult)
+import           Language.Cimple.ParseResult   (ParseResult, toEither)
 import           Language.Cimple.Tokens        (LexemeClass (..))
 }
 
@@ -274,7 +276,13 @@ recurse _ ns                          = fail $ "TreeParser.recurse: " <> show ns
 
 parseDocComment :: NonTerm -> ParseResult NonTerm
 parseDocComment (Fix (Comment Doxygen start body end)) =
-    Fix . CommentInfo <$> parseComment (start : body ++ [end])
+    case parseComment (map (:[]) $ start : body ++ [end]) of
+      ParseOK r f ->
+          case decode (fromJust . flip Map.lookup f) r :: [ParseResult (Comment (Lexeme Text))] of
+            [x] -> Fix . CommentInfo <$> x
+            xs -> error (show (map toEither xs))
+      ParseEOF f -> error (show f)
+      ParseError ts f -> error (show (ts, f))
 parseDocComment n = return n
 
 failAt :: NonTerm -> String -> ParseResult a

@@ -424,7 +424,7 @@ VarDeclStmt
 VarDecl :: { NonTerm }
 VarDecl
 :	QualType ID_VAR DeclSpecArrays				{ Fix $ VarDecl $1 $2 $3 }
-|	ID_FUNC_TYPE '*' ID_VAR DeclSpecArrays			{ Fix $ VarDecl (Fix $ TyPointer $ Fix $ TyFunc $1) $3 $4 }
+|	ID_FUNC_TYPE '*' ID_VAR DeclSpecArrays			{ Fix $ VarDecl (tyPointer $ Fix $ TyFunc $1) $3 $4 }
 
 DeclSpecArrays :: { [NonTerm] }
 DeclSpecArrays
@@ -707,7 +707,7 @@ CallbackDecl
 
 FunctionPrototype(id)
 :	QualType id FunctionParamList				{ Fix $ FunctionPrototype $1 $2 $3 }
-|	ID_FUNC_TYPE '*' id FunctionParamList			{ Fix $ FunctionPrototype (Fix $ TyPointer $ Fix $ TyFunc $1) $3 $4 }
+|	ID_FUNC_TYPE '*' id FunctionParamList			{ Fix $ FunctionPrototype (tyPointer $ Fix $ TyFunc $1) $3 $4 }
 
 FunctionParamList :: { [NonTerm] }
 FunctionParamList
